@@ -20,14 +20,34 @@ app.use(express.static("public"));
 app.set("view engine", "ejs");
 
 app.get("/", async (req, res) => {
+    const sort = req.query.sort || "date_desc";
+
+    let sortQuery;
+    switch (sort) {
+        case "rating_desc":
+            sortQuery = "ORDER BY rating DESC";
+            break;
+        case "rating_asc":
+            sortQuery = "ORDER BY rating ASC";
+            break;
+        case "date_asc":
+            sortQuery = "ORDER BY date_read ASC";
+            break;
+        case "date_desc":
+        default:
+            sortQuery = "ORDER BY date_read DESC";
+            break;
+    }
+
     try {
-        const result = await db.query("SELECT * FROM books ORDER BY COALESCE(date_read, '1970-01-01') DESC;");
-        res.render("index", { books: result.rows});
+        const result = await db.query(`SELECT * FROM books ${sortQuery};`);
+        res.render("index", { books: result.rows, selectedSort: sort });
     } catch (err) {
         console.error(err);
         res.status(500).send("Error fetching books");
     }
 });
+
 
 app.get("/add", (req, res) => {
     res.render("add", { error: req.query.error });
@@ -124,6 +144,22 @@ app.post("/update/:id", async (req, res) => {
         res.status(500).send("Error updating book");
     }
 });
+
+app.get("/post/:id", async (req, res) => {
+    const bookId = req.params.id;
+    try {
+        const result = await db.query("SELECT * FROM books WHERE id = $1;", [bookId]);
+        if (result.rows.length === 0) {
+            return res.status(404).send("Book not found");
+        }
+        const book = result.rows[0];
+        res.render("post", { book });
+    } catch (err) {
+        console.error("Error fetching post:", err);
+        res.status(500).send("Internal Server Error");
+    }
+});
+
 
 
 app.post("/delete/:id", async (req, res) => {
